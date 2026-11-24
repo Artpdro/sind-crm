@@ -188,4 +188,4 @@ def test_migracao_do_banco_antigo_preserva_dados(tmp_path):
     assert init_db(e) is True and init_db(e) is False
     with e.connect() as c:
         assert c.execute(text("SELECT nome, precisa_revisao, motivos_revisao FROM empresas")).one() == ("GUARDADA", 0, "[]")
-        assert c.execute(text("SELECT version FROM schema_migrations ORDER BY version")).scalars().all() == [1, 2, 3, 4, 5]
+        assert c.execute(text("SELECT version FROM schema_migrations ORDER BY version")).scalars().all() == [1, 2, 3, 4, 5, 6]

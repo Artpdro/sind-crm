@@ -18,6 +18,7 @@ from app.modules.importacao.router import router as importacao_router
 from app.modules.mapa.router import router as mapa_router
 from app.modules.relatorios.router import router as relatorios_router
 from app.modules.dashboard.router import router as dashboard_router
+from app.modules.receita.router import router as receita_router
 from app.schema import init_db
 from app.modules.users.router import router as users_router
 
@@ -139,3 +140,4 @@ app.include_router(geocoding_router)
 app.include_router(mapa_router)
 app.include_router(relatorios_router)
 app.include_router(dashboard_router)
+app.include_router(receita_router)

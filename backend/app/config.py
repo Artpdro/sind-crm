@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     geocoder_pular_numero_raro: bool = True  # pula a busca 'com número' se ela quase nunca acha (o OSM do Brasil raramente tem o número)
     cnefe_ativo: bool = True  # usa a base do IBGE (CNEFE) quando ela foi importada: localização exata por número
     cnefe_db: str = "./data/cnefe.db"
+    receita_ativo: bool = True  # consulta da situação cadastral (ativa/inativa/inapta) na Receita Federal
+    receita_url: str = "https://brasilapi.com.br/api/cnpj/v1/{cnpj}"  # serviço público que espelha a base da Receita ({cnpj} = 14 dígitos)
+    receita_timeout: float = 8.0
+    receita_cache_horas: int = 24
     max_marcadores: int = 10000
     pdf_mapa_ruas: bool = True  # mapa do PDF com as ruas do OpenStreetMap (precisa de internet ao gerar; sem ela cai no mapa esquemático)
     tiles_url: str = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"

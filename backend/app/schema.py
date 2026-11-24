@@ -310,7 +310,20 @@ INSERT INTO schema_migrations (version) VALUES (5);
 COMMIT;
 """
 
-MIGRACOES = [(1, SCHEMA_SQL), (2, SCHEMA_V2_SQL), (3, SCHEMA_V3_SQL), (4, SCHEMA_V4_SQL), (5, SCHEMA_V5_SQL)]
+SCHEMA_V6_SQL = """
+BEGIN;
+-- Cache da situação cadastral consultada na Receita Federal (só CNPJ + situação; nada além disso).
+CREATE TABLE receita_cache (
+    cnpj          TEXT PRIMARY KEY CHECK (length(cnpj) = 14 AND cnpj NOT GLOB '*[^0-9]*'),
+    situacao      TEXT NOT NULL CHECK (situacao IN ('ativa','inativa','inapta')),
+    descricao     TEXT NOT NULL CHECK (length(descricao) BETWEEN 1 AND 40),
+    consultado_em TEXT NOT NULL
+) WITHOUT ROWID;
+INSERT INTO schema_migrations (version) VALUES (6);
+COMMIT;
+"""
+
+MIGRACOES = [(1, SCHEMA_SQL), (2, SCHEMA_V2_SQL), (3, SCHEMA_V3_SQL), (4, SCHEMA_V4_SQL), (5, SCHEMA_V5_SQL), (6, SCHEMA_V6_SQL)]
 
 
 def init_db(engine: Engine) -> bool:

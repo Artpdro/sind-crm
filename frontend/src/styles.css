@@ -152,3 +152,9 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
 .tile span { color: #52606d; font-size: .85rem; }
 .item-ativ { padding: 8px 0; border-bottom: 1px solid var(--line); list-style: none; }
 .pontinho { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+
+/* Situação cadastral na Receita Federal (rótulo em texto: a cor nunca é a única informação) */
+.sit-rf { display: inline-block; padding: .3rem .9rem; border-radius: 999px; font-weight: 700; font-size: 1.05rem; }
+.sit-ativa { background: #dcfce7; color: #166534; }
+.sit-inapta { background: #fef3c7; color: #92400e; }
+.sit-inativa { background: #fee2e2; color: #991b1b; }

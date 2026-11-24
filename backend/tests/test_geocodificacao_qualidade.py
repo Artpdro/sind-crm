@@ -285,7 +285,7 @@ def test_migracao_v4_preserva_precisao_e_aceita_bairro(tmp_path):
     with e.begin() as c:
         assert c.execute(text("SELECT nome, geocode_precisao, latitude FROM empresas ORDER BY id")).all() == [("A", "rua", -8.0), ("B", "manual", None)]
         c.execute(text("INSERT INTO empresas (nome, geocode_precisao) VALUES ('C', 'bairro')"))
-        assert c.execute(text("SELECT version FROM schema_migrations ORDER BY version")).scalars().all() == [1, 2, 3, 4, 5]
+        assert c.execute(text("SELECT version FROM schema_migrations ORDER BY version")).scalars().all() == [1, 2, 3, 4, 5, 6]
     with pytest.raises(IntegrityError):
         with e.begin() as c:
             c.execute(text("INSERT INTO empresas (nome, geocode_precisao) VALUES ('D', 'inventado')"))
