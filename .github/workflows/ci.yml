@@ -1,0 +1,54 @@
+name: ci
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: backend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -r requirements-dev.txt
+      - run: pytest
+      - name: SAST (bandit)
+        run: bandit -q -r app scripts
+      - name: Dependências (pip-audit)
+        run: pip-audit -r requirements.txt
+  frontend:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: frontend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+      - run: npm run build
+      - run: npm audit --audit-level=high
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: gitleaks/gitleaks-action@v2
+        env: { GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
+  dast:
+    # DAST manual (Actions -> ci -> Run workflow). Sobe o sistema com dados fictícios e roda o OWASP ZAP baseline.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Subir backend e frontend
+        run: |
+          cd backend && pip install -r requirements.txt && cp .env.example .env
+          python -m scripts.init_db
+          nohup uvicorn app.main:app --port 8000 > ../backend.log 2>&1 &
+          cd ../frontend && npm ci && nohup npm run dev -- --host 127.0.0.1 > ../frontend.log 2>&1 &
+          sleep 15
+      - uses: zaproxy/action-baseline@v0.12.0
+        with:
+          target: "http://127.0.0.1:5173"
+          allow_issue_writing: false
