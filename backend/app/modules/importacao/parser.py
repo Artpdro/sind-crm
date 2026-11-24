@@ -1,8 +1,9 @@
-"""Leitura SEGURA de .xlsx. O arquivo é tratado como entrada não confiável:
+"""Leitura SEGURA de .xlsx e .xls. O arquivo é tratado como entrada não confiável:
 - nunca é gravado em disco nem executado; é lido em memória;
 - a estrutura do ZIP é validada ANTES de abrir (zip bomb, path traversal, macros, vínculos externos);
 - o XML é lido com defusedxml (bloqueia 'billion laughs' / XXE);
-- fórmulas não são calculadas (data_only=True: só valores já gravados)."""
+- fórmulas não são calculadas (data_only=True: só valores já gravados);
+- .xls (formato antigo, binário): lido só com xlrd, que apenas extrai valores (não executa macros nem vínculos)."""
 import io
 import re
 import unicodedata
@@ -16,11 +17,17 @@ MAX_LINHAS = 20000
 MAX_COLUNAS = 40
 MAX_CELULA = 5000
 
-COLUNAS = {  # cabeçalho esperado -> campo interno
-    "Nome da Empresa": "nome", "Email": "email", "Emails adicionais": "emails_adicionais", "Celular": "celular",
-    "Nome Fantasia": "nome_fantasia", "CNPJ": "cnpj", "Fone": "fone", "Rua": "rua", "Número": "numero",
+COLUNAS = {  # cabeçalho esperado (como o Asaas exporta) -> campo interno
+    "Nome": "nome", "Email": "email", "Emails adicionais": "emails_adicionais", "Celular": "celular",
+    "Empresa": "nome_fantasia", "CPF ou CNPJ": "cnpj", "Fone": "fone", "Rua": "rua", "Número": "numero",
     "Complemento": "complemento", "Bairro": "bairro", "Cidade": "cidade", "CEP": "cep", "Estado": "estado",
 }
+ALIASES = {  # nomes antigos continuam aceitos
+    "Nome da Empresa": "nome", "Nome Fantasia": "nome_fantasia", "CNPJ": "cnpj",
+}
+# Qualquer outra coluna (ex.: "Identificador externo", "Valor vencido", "Valor pago", "Valor a vencer") é IGNORADA e listada na prévia.
+ASSINATURA_XLSX = b"PK\x03\x04"
+ASSINATURA_XLS = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"  # contêiner OLE2 do .xls
 
 
 class ArquivoInvalido(Exception):
@@ -32,13 +39,13 @@ def _chave(texto: str) -> str:
     return re.sub(r"\s+", " ", t).strip().lower()
 
 
-_POR_CHAVE = {_chave(k): (k, v) for k, v in COLUNAS.items()}
+_POR_CHAVE = {_chave(k): (k, v) for k, v in {**COLUNAS, **ALIASES}.items()}
 _SUSPEITOS = ("vbaproject.bin", "xl/embeddings/", "xl/externallinks/", "xl/activex/", "xl/ctrlprops/")
 
 
 def validar_zip(data: bytes) -> None:
     if not data.startswith(b"PK\x03\x04"):
-        raise ArquivoInvalido("O arquivo não é uma planilha .xlsx válida.")
+        raise ArquivoInvalido("O arquivo não é uma planilha .xlsx ou .xls válida.")
     try:
         z = zipfile.ZipFile(io.BytesIO(data))
         infos = z.infolist()
@@ -103,7 +110,8 @@ class Planilha:
         self.avisos: list[str] = []
 
 
-def ler_planilha(data: bytes) -> Planilha:
+def _abrir_xlsx(data: bytes):
+    """Devolve (cabeçalho, iterador de linhas, número de abas, função de fechar)."""
     validar_zip(data)
     from openpyxl import load_workbook  # importado aqui: só carrega quando há upload
     try:
@@ -111,15 +119,72 @@ def ler_planilha(data: bytes) -> Planilha:
     except Exception:
         raise ArquivoInvalido("Não foi possível ler a planilha (arquivo corrompido ou formato não suportado).")
     try:
-        p = Planilha()
-        if len(wb.worksheets) > 1:
-            p.avisos.append(f"A planilha tem {len(wb.worksheets)} abas; somente a primeira foi lida.")
-        ws = wb.worksheets[0]
-        it = ws.iter_rows(values_only=True)
+        it = wb.worksheets[0].iter_rows(values_only=True)
         try:
             cab = next(it)
         except StopIteration:
             raise ArquivoInvalido("A planilha está vazia.")
+    except Exception:
+        wb.close()
+        raise
+    return cab, it, len(wb.worksheets), wb.close
+
+
+def _abrir_xls(data: bytes):
+    import xlrd  # importado aqui: só carrega quando há upload
+    try:
+        wb = xlrd.open_workbook(file_contents=data, on_demand=True, formatting_info=False)
+    except xlrd.XLRDError as e:
+        if "encrypt" in str(e).lower() or "password" in str(e).lower():
+            raise ArquivoInvalido("Planilhas protegidas por senha não são aceitas.")
+        raise ArquivoInvalido("Não foi possível ler a planilha .xls (arquivo corrompido ou formato não suportado).")
+    except Exception:
+        raise ArquivoInvalido("Não foi possível ler a planilha .xls (arquivo corrompido ou formato não suportado).")
+    try:
+        if wb.nsheets == 0:
+            raise ArquivoInvalido("A planilha está vazia.")
+        ws = wb.sheet_by_index(0)
+        if ws.nrows == 0:
+            raise ArquivoInvalido("A planilha está vazia.")
+        if ws.ncols > MAX_COLUNAS:
+            raise ArquivoInvalido(f"A planilha tem colunas demais (máximo {MAX_COLUNAS}).")
+        if ws.nrows > MAX_LINHAS + 1:
+            raise ArquivoInvalido(f"A planilha excede o limite de {MAX_LINHAS} linhas.")
+
+        def valor(c):
+            if c.ctype == xlrd.XL_CELL_DATE:
+                try:
+                    return xlrd.xldate_as_datetime(c.value, wb.datemode)
+                except Exception:
+                    return ""
+            if c.ctype in (xlrd.XL_CELL_EMPTY, xlrd.XL_CELL_BLANK, xlrd.XL_CELL_ERROR):
+                return None
+            if c.ctype == xlrd.XL_CELL_BOOLEAN:
+                return bool(c.value)
+            return c.value
+
+        linhas = ([valor(ws.cell(r, c)) for c in range(ws.ncols)] for r in range(ws.nrows))
+        cab = next(linhas)
+    except ArquivoInvalido:
+        wb.release_resources()
+        raise
+    except Exception:
+        wb.release_resources()
+        raise ArquivoInvalido("Não foi possível ler a planilha .xls (conteúdo inválido).")
+    return cab, linhas, wb.nsheets, wb.release_resources
+
+
+def ler_planilha(data: bytes) -> Planilha:
+    if data.startswith(ASSINATURA_XLSX):
+        cab, it, abas, fechar = _abrir_xlsx(data)
+    elif data.startswith(ASSINATURA_XLS):
+        cab, it, abas, fechar = _abrir_xls(data)
+    else:
+        raise ArquivoInvalido("O arquivo não é uma planilha .xlsx ou .xls válida.")
+    try:
+        p = Planilha()
+        if abas > 1:
+            p.avisos.append(f"A planilha tem {abas} abas; somente a primeira foi lida.")
         if len(cab) > MAX_COLUNAS:
             raise ArquivoInvalido(f"A planilha tem colunas demais (máximo {MAX_COLUNAS}).")
         mapa: dict[int, str] = {}
@@ -153,4 +218,4 @@ def ler_planilha(data: bytes) -> Planilha:
             raise ArquivoInvalido("A planilha não tem nenhuma linha de dados.")
         return p
     finally:
-        wb.close()
+        fechar()

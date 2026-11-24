@@ -19,7 +19,7 @@ from app.security import ratelimit, sessions
 router = APIRouter(prefix="/api/importacoes", tags=["importacao"])
 admin = sessions.require_role("admin")  # importar altera muitos dados de uma vez: só administrador
 
-MIMES_XLSX = {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/octet-stream", ""}
+MIMES_XLSX = {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel", "application/octet-stream", ""}
 
 
 class ConfirmarIn(Strict):
@@ -60,8 +60,8 @@ def enviar(request: Request, arquivo: UploadFile = File(...), user=Depends(admin
         raise HTTPException(status_code=429, detail="Muitos envios. Aguarde antes de tentar de novo.")
     nome = _nome_seguro(arquivo.filename)
     low = nome.lower()
-    if not low.endswith(".xlsx"):
-        raise HTTPException(status_code=422, detail="Envie um arquivo .xlsx. Se a planilha for .xls, abra no Excel e use 'Salvar como' .xlsx.")
+    if not low.endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=422, detail="Envie uma planilha do Excel (.xlsx ou .xls).")
     if (arquivo.content_type or "") not in MIMES_XLSX:
         raise HTTPException(status_code=422, detail="Tipo de arquivo não aceito.")
     data = arquivo.file.read(s.max_upload_bytes + 1)

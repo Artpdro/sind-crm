@@ -4,7 +4,7 @@ Estado: **Fases 1 e 2**
 - Fase 1: login com usuário e senha, perfis (Administrador / Operador / Visualizador), auditoria, banco **SQLite local** (`backend/data/sindnorte.db`, sem servidor de banco).
 - Fase 2: empresas (cadastrar, editar, excluir, listar com busca/filtros/paginação), **consulta por CNPJ**, perfil completo, **histórico de interações**,
   situações/categorias/portes/tipos administráveis e **campos personalizados**.
-- Fase 3: **importação do Excel (.xlsx)** com validação, prévia, confirmação, modos (cadastrar novos / atualizar existentes / ambos) e empresas marcadas para revisão.
+- Fase 3: **importação do Excel (.xls e .xlsx)** com validação, prévia, confirmação, modos (cadastrar novos / atualizar existentes / ambos) e empresas marcadas para revisão.
 - Fase 4: **geocodificação automática** (toda empresa nova ou com endereço alterado é mapeada sozinha) e **Mapa de Empresas** (pesquisa por rua/bairro/número/cidade, pares/ímpares, filtros, lista, agrupamento de marcadores).
 - Próximas: PDF e dashboard (Fase 5), revisão final de segurança (Fase 6).
 
@@ -47,13 +47,14 @@ cd ../frontend && npm audit
 - **Duplicatas na importação (Fase 3):** quando o mesmo CNPJ aparecer em mais de uma linha, será mantido o registro mais completo.
 
 ## Importação do Excel (só Administrador) — menu "Importar"
-1. **Enviar** o .xlsx: o sistema valida e mostra a **prévia** (nada é gravado ainda): novas, para atualizar, sem alteração, duplicadas, rejeitadas e quais entrarão para revisão.
+1. **Enviar** a planilha (.xls ou .xlsx, no formato exportado pelo Asaas): o sistema valida e mostra a **prévia** (nada é gravado ainda): novas, para atualizar, sem alteração, duplicadas, rejeitadas e quais entrarão para revisão.
+   **Colunas lidas:** Nome (→ Nome da Empresa), Email, Emails adicionais, Celular, Empresa (→ Nome Fantasia), CPF ou CNPJ (→ CNPJ), Fone, Rua, Número, Complemento, Bairro, Cidade, CEP, Estado. As colunas **Identificador externo**, **Valor vencido**, **Valor pago** e **Valor a vencer** (e qualquer outra) são ignoradas e listadas na prévia. Os nomes antigos (Nome da Empresa, Nome Fantasia, CNPJ) continuam aceitos.
 2. **Escolher o modo** e **confirmar**. É tudo-ou-nada: se algo falhar, nenhuma empresa é alterada. Cada importação só pode ser confirmada uma vez.
 - **Identificação por CNPJ** (normalizado). Mesmo CNPJ em mais de uma linha: **fica a linha mais completa** (empate: a primeira).
 - **Linhas sem CNPJ ou com CNPJ inválido/incompleto**: entram como **empresas novas marcadas "Revisar"**; o valor original do CNPJ fica guardado (`cnpj_original`) e nada é inventado. O mesmo vale para CEP incompleto, telefone/email inválidos (o valor original vai para o motivo) e endereço sem rua ou sem cidade. Reimportar o mesmo arquivo não duplica essas linhas (comparação por nome + rua + número + cidade).
 - **Atualizar** só troca valores que vieram preenchidos e diferentes; célula vazia **nunca apaga** dado existente; situação, porte, categorias, campos personalizados, informações adicionais e coordenadas não são tocados. Email antigo substituído vai para os emails adicionais. Mudou o endereço: a localização é marcada como desatualizada (coordenadas preservadas).
 - "Cidade - Estado" (ex.: "Olinda - Pernambuco") é separado em cidade e UF. Textos que começam com `= + - @` ganham um apóstrofo (**neutralização de fórmulas**, para futuras exportações).
-- **Segurança do upload**: só `.xlsx` (para `.xls`, salve como .xlsx no Excel); limite de 5 MB e 20.000 linhas; o arquivo **não é gravado em disco**, é lido em memória; recusa macros, objetos incorporados, vínculos externos, ZIP com caminhos perigosos, zip bomb, planilha com senha e qualquer declaração XML (`DOCTYPE`/`ENTITY`); fórmulas nunca são calculadas; até 10 envios por hora.
+- **Segurança do upload**: `.xlsx` e `.xls` (o tipo é identificado pelo CONTEÚDO, não só pela extensão; o `.xls` é lido com xlrd, que só extrai valores e não executa macros); limite de 5 MB e 20.000 linhas; o arquivo **não é gravado em disco**, é lido em memória; recusa macros, objetos incorporados, vínculos externos, ZIP com caminhos perigosos, zip bomb, planilha com senha e qualquer declaração XML (`DOCTYPE`/`ENTITY`); fórmulas nunca são calculadas; até 10 envios por hora.
 - **LGPD**: as linhas da planilha ficam guardadas só enquanto a prévia está aberta (apagadas ao confirmar, cancelar ou depois de 24 h). A auditoria registra a operação e as contagens, nunca dados das empresas.
 
 ## Mapa e geocodificação (Fase 4)
@@ -91,5 +92,16 @@ Com a API parada, copie `backend/data/sindnorte.db` (e, se existirem, os arquivo
 - **Ainda sem tela:** gerenciar campos personalizados e usuários (existem na API: `/api/campos`, `/api/users`; documentação interativa em http://localhost:8000/api/docs com a API rodando).
 - PDF e dashboard ainda não existem (botão "Baixar PDF" do mapa está desativado).
 - **A qualidade real da geocodificação ainda não foi medida** (o ambiente de desenvolvimento não alcança o OpenStreetMap; os testes usam um serviço simulado). Rode a amostra com `--dry-run` e confira.
-- Planilhas `.xls` (formato antigo) não são lidas por segurança; salve como `.xlsx`. Empresa **excluída** que reaparece na planilha pelo mesmo CNPJ é rejeitada (ainda não há tela para restaurar).
+- Empresa **excluída** que reaparece na planilha pelo mesmo CNPJ é rejeitada (ainda não há tela para restaurar).
 - Reset de senha por e-mail exige SMTP; sem ele, use `python -m scripts.admin reset-password USUARIO`.
+
+
+## Consulta da situação cadastral na Receita Federal
+
+Na aba **Consultar**, ao buscar um CNPJ o sistema também mostra a **situação cadastral** dele na Receita Federal: **Ativa**, **Inativa** ou **Inapta** (e o texto original, como BAIXADA ou SUSPENSA). Só esse campo é consultado e exibido.
+
+- **Ativa** = Ativa · **Inapta** = Inapta · **Inativa** = Baixada, Suspensa ou Nula.
+- A Receita não tem API pública gratuita (o site oficial exige captcha). Usamos a **BrasilAPI**, que espelha a base da Receita. Dá para trocar o serviço em `RECEITA_URL` (o modelo precisa ter `{cnpj}`) ou desligar tudo com `RECEITA_ATIVO=false`.
+- A consulta sai **do servidor** (o navegador nunca fala com o serviço externo), só por https, sem seguir redirecionamentos, com timeout, resposta limitada e CNPJ validado (14 dígitos + dígito verificador) antes de entrar na URL.
+- Resultado guardado por 24 h (`RECEITA_CACHE_HORAS`) numa tabela só com CNPJ + situação. Limite de 60 consultas por hora por usuário. A auditoria registra a situação, nunca o CNPJ.
+- Qualquer perfil logado pode consultar. O servidor precisa de saída para a internet; sem ela a tela mostra "Tentar novamente".

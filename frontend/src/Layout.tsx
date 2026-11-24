@@ -15,7 +15,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       <header className={user ? "topbar" : "topbar sem-menu"}>
         <div className="container topbar-in">
           <Link to="/" className="brand" aria-label="Sindnorte — início">
-            <img src={logo} alt="Sindnorte PE — Sindicato Empresarial do Sistema Comércio" width={150} height={58} />
+            <img src={logo} alt="Sindnorte PE — Sindicato Empresarial do Sistema Comércio" width={190} height={40} />
           </Link>
           {user && (
             <>
@@ -42,7 +42,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       <main className="container main">{children}</main>
       <footer className="footer">
         <div className="container footer-in">
-          <div><img src={logoBranca} alt="Sindnorte PE" width={144} height={56} />Sindicato Empresarial do Sistema Comércio<br /><span style={{ opacity: .8 }}>CNC · Fecomércio · Sesc · Senac</span></div>
+          <div><img src={logoBranca} alt="Sindnorte PE" width={190} height={40} />Sindicato Empresarial do Sistema Comércio<br /><span style={{ opacity: .8 }}>CNC · Fecomércio · Sesc · Senac</span></div>
           <div>Sede: Rua Epitácio Pessoa, 04, Centro — Paulista, PE<br />Seg a Sex, 07:30–12:00 / 13:00–17:00</div>
           <div className="footer-fim">Sistema de gestão e mapa de empresas · uso interno · contém dados pessoais protegidos pela LGPD</div>
         </div>

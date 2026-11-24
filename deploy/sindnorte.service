@@ -1,0 +1,26 @@
+[Unit]
+Description=Sindnorte PE - API (FastAPI)
+After=network.target
+
+[Service]
+User=sindnorte
+Group=sindnorte
+WorkingDirectory=/opt/sindnorte/backend
+EnvironmentFile=/opt/sindnorte/backend/.env
+ExecStart=/opt/sindnorte/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1 --proxy-headers --forwarded-allow-ips=127.0.0.1
+Restart=always
+RestartSec=3
+
+# Endurecimento do serviço
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/sindnorte/backend/data
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

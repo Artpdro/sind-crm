@@ -21,7 +21,7 @@ Sistema: gestão e mapa de empresas do Sindnorte (FastAPI + SQLite + React). Est
 | **D**enial of service | planilha-bomba; upload gigante; geração de PDF em loop; martelar login | limite 5 MB / 20 mil linhas; validação de zip (razão de compressão, macros, entidades XML); corpo limitado antes de ler; 30 PDFs/h por usuário; limites em login/importação/geocodificação; mapa limita marcadores; PDF limita empresas e atividades | `test_importacao`, `test_relatorios`, `test_mapa` |
 | **E**levation of privilege | operador/visualizador chamando ação de admin; trocar `id` na URL | RBAC no servidor em cada rota (admin/operador/visualizador); autor sempre = usuário da sessão; empresa excluída some de lista, mapa, PDF e painel | `test_rbac_users`, `test_concorrencia_e_regressao` |
 | **SSRF** | fazer o servidor acessar rede interna via geocodificador/mapa | destino **fixo** vindo do `.env`; só https; bloqueia localhost, IP privado, link-local, metadados (169.254.169.254); **sem seguir redirecionamentos**; resposta limitada; blocos de mapa só PNG 256×256 ≤ 300 KB; cache sem sair da pasta | `test_geocoding`, `test_pdf_mapa_ruas` |
-| Upload malicioso | .xlsx com macro, link externo, caminho `../` | só `.xlsx`; processado em memória (nunca no disco); rejeita macro, externalLinks, criptografia, DOCTYPE/ENTITY | `test_importacao` |
+| Upload malicioso | .xlsx com macro, link externo, caminho `../` | `.xlsx` e `.xls` (tipo pelo conteúdo; `.xls` lido só com xlrd); processado em memória (nunca no disco); rejeita macro, externalLinks, criptografia, DOCTYPE/ENTITY | `test_importacao` |
 | Corrida / integridade | duas confirmações da mesma importação; dois geocodificadores; mesmo CNPJ cadastrado juntos | `BEGIN IMMEDIATE`; vencedor único na confirmação; trava (`geocode_lease`); `UNIQUE` de CNPJ **no banco**; `version` | `test_importacao`, `test_empresas`, `test_concorrencia_e_regressao` |
 
 ## 3. Mapa de confiança (onde os dados cruzam fronteiras)
@@ -73,3 +73,14 @@ Sistema: gestão e mapa de empresas do Sindnorte (FastAPI + SQLite + React). Est
 | 2 | `vite` 8.3.x com 3 avisos "high" (`launch-editor`, só no servidor de desenvolvimento no Windows) | alta (dev) | `npm audit fix` → 0 vulnerabilidades | CI `npm audit` |
 | 3 | Sem rotina de backup | média | `scripts/backup.py` (cópia consistente com sistema ligado, verificação de integridade, retenção) | `test_backup_*` |
 | 4 | Concorrência de edição, trava do geocodificador, interações e PDFs simultâneos sem prova automatizada | baixa | testes com threads | `test_concorrencia_e_regressao` |
+
+
+## Consulta à Receita Federal (situação cadastral)
+| Risco | Controle |
+|---|---|
+| SSRF / destino interno | URL fixa da configuração; só https; bloqueia localhost, redes privadas e metadados; sem redirecionamentos; CNPJ só entra na URL após validação (14 dígitos + DV) |
+| Vazamento de CNPJs a terceiros pelo navegador | A consulta sai só do servidor; o navegador fala apenas com a própria API (CSP `connect-src 'self'`) |
+| Excesso de dados pessoais | Só a situação cadastral é lida, guardada (cache de 24 h: CNPJ + situação) e repassada; sócios, telefones e endereço do retorno são descartados |
+| Abuso / custo | 60 consultas/hora por usuário (cache não conta); timeout de 8 s; resposta limitada a 256 KB |
+| Vazamento de erro | Mensagens genéricas; o corpo da resposta do serviço nunca é repassado |
+| Auditoria | `consulta_receita` registra só a situação, nunca o CNPJ |

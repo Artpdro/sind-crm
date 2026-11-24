@@ -30,6 +30,8 @@ export default function Relatorios() {
   useEffect(() => {
     api<{ id: number; username: string }[]>("/api/relatorios/usuarios").then(setUsuarios).catch(() => undefined);
     api<Opcao[]>("/api/cadastros/situacoes").then(setSit).catch(() => undefined);
+    void carregar(1);  // já mostra os últimos 7 dias ao abrir a página
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const params = (extra: Record<string, string> = {}) => {

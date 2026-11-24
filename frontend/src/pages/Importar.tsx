@@ -52,9 +52,9 @@ export default function Importar() {
   return (
     <section>
       <h1>Importar empresas</h1>
-      <p className="muted">Envie a planilha <strong>.xlsx</strong> (até 5 MB) com as colunas: Nome da Empresa, Email, Emails adicionais, Celular, Nome Fantasia, CNPJ, Fone, Rua, Número, Complemento, Bairro, Cidade, CEP, Estado. Nada é gravado antes da sua confirmação.</p>
+      <p className="muted">Envie a planilha do Excel (<strong>.xls</strong> ou <strong>.xlsx</strong>, até 5 MB) com as colunas: Nome, Email, Emails adicionais, Celular, Empresa, CPF ou CNPJ, Fone, Rua, Número, Complemento, Bairro, Cidade, CEP, Estado. Outras colunas (como Identificador externo e Valor vencido) são ignoradas. Nada é gravado antes da sua confirmação.</p>
       {(!imp || !emPrevia) && (
-        <div className="card"><label>Arquivo .xlsx<input type="file" accept=".xlsx" onChange={enviar} disabled={busy} /></label>
+        <div className="card"><label>Arquivo .xls ou .xlsx<input type="file" accept=".xls,.xlsx" onChange={enviar} disabled={busy} /></label>
           {busy && <p className="muted">Processando…</p>}</div>)}
       {err && <p role="alert" className="error">{err}</p>}
 

@@ -4,3 +4,4 @@ httpx>=0.27
 pip-audit
 bandit
 pypdf>=4
+xlwt>=1.3

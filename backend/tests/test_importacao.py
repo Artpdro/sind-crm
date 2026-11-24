@@ -390,7 +390,7 @@ def test_xss_na_planilha_fica_como_texto(login):
 def test_extensao_e_mime_falsos(login):
     c, h = login("adm", "admin")
     ok = xlsx([L()])
-    assert enviar(c, h, ok, nome="clientes.xls").status_code == 422
+    assert enviar(c, h, ok, nome="clientes.xls").status_code == 201   # extensão .xls é aceita; o tipo real vem do CONTEÚDO
     assert enviar(c, h, ok, nome="clientes.csv").status_code == 422
     assert enviar(c, h, ok, nome="clientes.xlsm").status_code == 422
     assert enviar(c, h, ok, nome="clientes").status_code == 422
@@ -621,3 +621,75 @@ def test_linhas_da_previa_filtros_e_paginacao(login):
     assert c.get(f"/api/importacoes/{imp['id']}/linhas?somente_revisao=true").json()["total"] == 1
     assert c.get(f"/api/importacoes/{imp['id']}/linhas?acao=novo").json()["total"] == 8
     assert c.get(f"/api/importacoes/{imp['id']}/linhas?acao=rejeitada").json()["total"] == 0
+
+
+# ───────── Planilha no formato exportado pelo Asaas (.xls) ─────────
+ASAAS_HEAD = ["Identificador externo", "Nome", "Email", "Emails adicionais", "Celular", "Empresa", "CPF ou CNPJ", "Fone", "Rua",
+              "Número", "Complemento", "Bairro", "Cidade", "CEP", "Estado", "Valor vencido", "Valor pago", "Valor a vencer"]
+
+
+def asaas_linha(**kw):
+    base = {"Nome": "HAPPY KIDS BRINQUEDOS LTDA", "Email": "loja@example.com", "Celular": "87991384045", "Empresa": "HAPPY KIDS",
+            "CPF ou CNPJ": C1, "Rua": "R GENERAL DANTAS BARRETO", "Número": "38", "Bairro": "SANTO ANTONIO",
+            "Cidade": "Garanhuns - Pernambuco", "CEP": "55293465", "Estado": "PE", "Valor vencido": "R$ 0,00",
+            "Valor pago": "R$ 700,00", "Valor a vencer": "R$ 0,00"}
+    base.update(kw)
+    return [base.get(k, "") for k in ASAAS_HEAD]
+
+
+def xls(rows, headers=ASAAS_HEAD) -> bytes:
+    import xlwt
+    wb = xlwt.Workbook()
+    ws = wb.add_sheet("Sheet0")
+    for j, h in enumerate(headers):
+        ws.write(0, j, h)
+    for i, r in enumerate(rows, start=1):
+        for j, v in enumerate(r):
+            ws.write(i, j, v)
+    b = io.BytesIO()
+    wb.save(b)
+    return b.getvalue()
+
+
+def test_xls_do_asaas_mapeia_colunas_e_ignora_as_demais(login, owner_engine):
+    c, h = login("adm", "admin")
+    dados = xls([asaas_linha(), asaas_linha(**{"Nome": "OUTRA LTDA", "CPF ou CNPJ": C2, "Empresa": "", "CEP": "5293465"})])
+    r = enviar(c, h, dados, nome="Clientes.xls", mime="application/vnd.ms-excel")
+    assert r.status_code == 201, r.text
+    imp = r.json()
+    assert imp["resumo"]["novas"] == 2 and imp["resumo"]["linhas_lidas"] == 2
+    assert set(imp["resumo"]["cabecalhos_ignorados"]) == {"Identificador externo", "Valor vencido", "Valor pago", "Valor a vencer"}
+    assert imp["resumo"]["novas_para_revisao"] == 1   # CEP com 7 dígitos
+    assert confirmar(c, h, imp).status_code == 200
+    e1, e2 = empresas(owner_engine)
+    assert (e1["nome"], e1["nome_fantasia"], e1["cnpj"]) == ("HAPPY KIDS BRINQUEDOS LTDA", "HAPPY KIDS", C1)
+    assert (e1["cidade"], e1["estado"], e1["cep"], e1["celular"], e1["numero"]) == ("Garanhuns", "PE", "55293465", "87991384045", "38")
+    assert e2["nome_fantasia"] is None and e2["cnpj"] == C2
+
+
+def test_xlsx_com_cabecalhos_do_asaas_e_nomes_antigos_continuam_valendo(login):
+    c, h = login("adm", "admin")
+    assert enviar(c, h, xlsx([asaas_linha()], headers=ASAAS_HEAD)).status_code == 201
+    assert enviar(c, h, xlsx([L()])).status_code == 201   # cabeçalhos antigos (Nome da Empresa, Nome Fantasia, CNPJ)
+
+
+def test_cabecalho_novo_e_antigo_juntos_sao_repetidos(login):
+    c, h = login("adm", "admin")
+    r = enviar(c, h, xlsx([asaas_linha() + ["x"]], headers=ASAAS_HEAD + ["Nome da Empresa"]))
+    assert r.status_code == 422 and "repetido" in r.json()["detail"].lower()
+
+
+def test_xls_falta_coluna_obrigatoria(login):
+    c, h = login("adm", "admin")
+    sem = [x for x in ASAAS_HEAD if x != "CPF ou CNPJ"]
+    r = enviar(c, h, xls([[""] * len(sem)], headers=sem), nome="a.xls", mime="application/vnd.ms-excel")
+    assert r.status_code == 422 and "CPF ou CNPJ" in r.json()["detail"]
+
+
+def test_xls_corrompido_ou_com_assinatura_falsa_e_recusado(login):
+    c, h = login("adm", "admin")
+    ole = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
+    for lixo in (ole + b"\x00" * 600, ole, b"MZ" + b"\x00" * 600, b"<html>x</html>", xls([asaas_linha()])[:300]):
+        r = enviar(c, h, lixo, nome="a.xls", mime="application/vnd.ms-excel")
+        assert r.status_code == 422, (lixo[:10], r.text)
+        assert "Traceback" not in r.text

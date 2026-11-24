@@ -86,8 +86,8 @@ def _cabecalho(titulo: str, agora: str, usuario: str, st) -> list:
     textos = [Paragraph(esc(titulo), st["h1"]), Paragraph(esc(f"Gerado em {agora} por {usuario}"), st["muted"])]
     if not LOGO.is_file():
         return textos + [Spacer(1, 4)]
-    larg = 42 * mm
-    logo = RLImage(str(LOGO), width=larg, height=larg * 1016 / 2620)
+    larg = 52 * mm
+    logo = RLImage(str(LOGO), width=larg, height=larg * 181 / 862)
     t = Table([[logo, textos]], colWidths=[larg + 6 * mm, LARGURA - larg - 6 * mm])
     t.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0)]))
     return [t, Spacer(1, 6)]

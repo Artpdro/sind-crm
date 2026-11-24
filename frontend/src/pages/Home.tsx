@@ -37,7 +37,7 @@ export default function Home() {
     ["Consultar empresa", "Busque pelo CNPJ.", "/consultar"],
     ["Cadastrar empresa", "Cadastro manual.", escreve ? "/empresas/nova" : null],
     ["Cadastros", "Situações, categorias, portes e tipos.", user?.role === "admin" ? "/cadastros" : null],
-    ["Importar empresas", "Planilha Excel (.xlsx) com prévia.", user?.role === "admin" ? "/importar" : null], ["Mapa de Empresas", "Pesquise, filtre e veja as empresas no mapa.", "/mapa"], ["Localização", "Geocodificação e correções.", escreve ? "/localizacao" : null],
+    ["Importar empresas", "Planilha Excel (.xls ou .xlsx) com prévia.", user?.role === "admin" ? "/importar" : null], ["Mapa de Empresas", "Pesquise, filtre e veja as empresas no mapa.", "/mapa"], ["Localização", "Geocodificação e correções.", escreve ? "/localizacao" : null],
   ];
   return (
     <section>

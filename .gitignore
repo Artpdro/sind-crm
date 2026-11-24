@@ -1,0 +1,14 @@
+# Dependências e ambientes locais
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+dist/
+# Segredos e dados locais (nunca versionar)
+.env
+*.db
+*.db-shm
+*.db-wal
+backend/data/
